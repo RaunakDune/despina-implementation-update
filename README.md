@@ -37,6 +37,12 @@ material are in the authors' repositories:
 }
 ```
 
+## License
+
+The code is released under the [MIT License](LICENSE). The paper is published under
+CC BY 4.0. The diffusers training scripts that `setup_env.sh` downloads into `third_party/`
+are Apache 2.0 and keep their own license.
+
 ## Status
 
 The full pipeline runs end to end on the 17 sample images in `DESPINA_dataset` and the
