@@ -1,0 +1,8 @@
+# Diagnostic variants: conditioning strength and duration.
+seeds: [0]
+defaults: {steps: 30, guidance: 7.0, lora_scale: 0.9, size: 1024, control_end: 1.0}
+configs:
+  - {name: lora_depth,     use_lora: true, controls: [depth],           control_scales: [0.8],      sources: {depth: dem}}
+  - {name: full,           use_lora: true, controls: [depth, softedge], control_scales: [0.8, 0.5], sources: {depth: dem, softedge: dem}}
+  - {name: full_weak_edge, use_lora: true, controls: [depth, softedge], control_scales: [0.8, 0.25], sources: {depth: dem, softedge: dem}}
+  - {name: full_end06,     use_lora: true, controls: [depth, softedge], control_scales: [0.8, 0.5], control_end: 0.6, sources: {depth: dem, softedge: dem}}

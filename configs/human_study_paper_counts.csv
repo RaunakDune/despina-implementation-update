@@ -1,0 +1,7 @@
+category,method,correct,total
+flat,despina,8,36
+flat,baseline,23,36
+hilly,despina,12,36
+hilly,baseline,30,36
+rocky,despina,10,36
+rocky,baseline,18,36

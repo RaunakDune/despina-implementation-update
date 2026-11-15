@@ -1,0 +1,2 @@
+2 python scripts/generate.py --sites-dir runs/smoke/sites --experiments configs/experiments.yaml --out runs/smoke/gen --devices cuda:0,cuda:1 --configs full,lora_depth --seeds 0 --steps 20 --lora runs/smoke/lora --cn-depth runs/smoke/cn_depth
+2 python scripts/generate.py --sites-dir runs/smoke/sites --experiments configs/experiments.yaml --out runs/smoke/gen --devices cuda:0,cuda:1 --configs baseline_imgcond,lora_softedge --seeds 0 --steps 20 --lora runs/smoke/lora

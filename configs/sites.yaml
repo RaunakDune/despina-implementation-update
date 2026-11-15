@@ -1,0 +1,27 @@
+# Evaluation sites. Camera position: give lon/lat (deg, planetocentric), x/y (DEM CRS metres)
+# or row/col (DEM pixels). heading_deg: 0 = north, clockwise. Fill in the real values for
+# Table 1 (Falcon LM, Eagle LM, EV-1, Chang'e-5 sites 1 and 2) once available, or run
+# scripts/fit_view.py to estimate heading/pitch/hfov from a reference photo's skyline.
+sites:
+  - name: repo_dem_demo
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.55, col_frac: 0.5, heading_deg: 135, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+    reference: null          # path to the real photo for this view (needed for SSIM / SoftEdge F1)
+    exclude_mask: null       # optional binary mask of non-terrain pixels in the reference photo
+  - name: smoke_with_photo   # code-path test only: the photo is NOT of this DEM location
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.55, col_frac: 0.5, heading_deg: 0, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+    reference: ../DESPINA_dataset/processed_apollo_imgs/AS17-147-22551HR.png
+# - name: falcon_lm
+#   dem: data/dems/apollo15_nac_dtm.tif
+#   upscale: 2
+#   camera: {lon: 3.6339, lat: 26.1322, heading_deg: ?, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+#   sun: {az: ?, el: ?}
+#   category: hilly
+#   reference: data/photos/AS15-xx-xxxx.png

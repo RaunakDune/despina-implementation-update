@@ -1,0 +1,27 @@
+# Diagnostic sites on the repo DEM: the original hillside view plus three Apollo-like
+# flat-ground views found with tools/find_views.py.
+sites:
+  - name: hillside
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.55, col_frac: 0.5, heading_deg: 135, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_0
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.1624, col_frac: 0.4915, heading_deg: 270, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_1
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.1726, col_frac: 0.6195, heading_deg: 270, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_2
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.2398, col_frac: 0.7005, heading_deg: 270, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly

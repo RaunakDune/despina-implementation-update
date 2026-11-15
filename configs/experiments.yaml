@@ -1,0 +1,13 @@
+# Generation configurations. "sources" says where each control image comes from:
+#   dem       -> ray-cast inverse depth / PiDiNet on the DEM simulated render (DESPINA)
+#   photo     -> DPT depth / PiDiNet on the reference photograph (image-conditioned baseline)
+# Table 2 ablation = the five DEM-conditioned configs; Table 1 = baseline vs full.
+seeds: [0, 1, 2]
+defaults: {steps: 30, guidance: 7.0, lora_scale: 0.9, size: 1024, control_end: 1.0}
+configs:
+  - {name: baseline_imgcond, use_lora: true,  controls: [depth],           control_scales: [0.8],      sources: {depth: photo}}
+  - {name: base_softedge,    use_lora: false, controls: [softedge],        control_scales: [0.6],      sources: {softedge: dem}}
+  - {name: base_depth,       use_lora: false, controls: [depth],           control_scales: [0.8],      sources: {depth: dem}}
+  - {name: lora_softedge,    use_lora: true,  controls: [softedge],        control_scales: [0.6],      sources: {softedge: dem}}
+  - {name: lora_depth,       use_lora: true,  controls: [depth],           control_scales: [0.8],      sources: {depth: dem}}
+  - {name: full,             use_lora: true,  controls: [depth, softedge], control_scales: [0.8, 0.5], sources: {depth: dem, softedge: dem}}
