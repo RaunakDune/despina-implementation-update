@@ -193,6 +193,34 @@ python tools/gpuq.py configs/jobs_smoke.txt --state runs/smoke/queue --gpus 1,2,
 python scripts/evaluate.py --sites-dir runs/smoke/sites --gen runs/smoke/gen --out runs/smoke/eval
 ```
 
+## Rebuilding the training images from the NASA scans
+
+The 17 sample images in `DESPINA_dataset` are all that is published of the training set, so
+the frames listed in its `dataset.csv` can be rebuilt from Arizona State University's
+[March to the Moon](https://tothemoon.im-ldi.com) archive of the Apollo Hasselblad film:
+
+```bash
+python tools/download_apollo.py --names DESPINA_dataset/dataset.csv --out data/apollo_raw --size med --workers 12
+python scripts/process_apollo.py --raw data/apollo_raw --out data/apollo_processed --workers 24
+python scripts/prep_training_data.py --images data/apollo_processed --dataset-root DESPINA_dataset \
+    --out data/train_set --recompute-depth           # one process per GPU with --shard/--num-shards
+python scripts/build_parquet.py --prep data/train_set
+```
+
+`despina/apollo.py` turns each film-strip scan into a training image:
+
+* B&W magazines are 16-bit greyscale scans and are scaled to 8 bits explicitly.
+* The 55 mm frame is located from the bright terrain, which reaches the frame's left, right
+  and bottom edges, and checked against the frame-to-strip width ratio (0.758).
+* The 5 x 5 reseau crosses are found with a matched filter, fitted as a rigid grid, and
+  removed by filling each 1-2 px line from the pixels beside it, which keeps film grain.
+* Colour scans get a grey-world white balance, since the scans carry film-dye casts.
+
+`processing.jsonl` records the crop and two quality flags per frame; frames where the crop
+fell back to the size prior (`qc_ok: false`) should be checked by eye. ASU does not serve
+magazine AS14-66 (36 frames). Depth maps are recomputed because the crops differ from the
+released ones; prompts come from `dataset.csv`.
+
 ## Diagnostics so far
 
 These runs used a LoRA and ControlNets trained on 15 of the 17 sample images (300 steps
