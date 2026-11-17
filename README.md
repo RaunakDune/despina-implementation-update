@@ -210,16 +210,23 @@ python scripts/build_parquet.py --prep data/train_set
 `despina/apollo.py` turns each film-strip scan into a training image:
 
 * B&W magazines are 16-bit greyscale scans and are scaled to 8 bits explicitly.
-* The 55 mm frame is located from the bright terrain, which reaches the frame's left, right
-  and bottom edges, and checked against the frame-to-strip width ratio (0.758).
-* The 5 x 5 reseau crosses are found with a matched filter, fitted as a rigid grid, and
-  removed by filling each 1-2 px line from the pixels beside it, which keeps film grain.
-* Colour scans get a grey-world white balance, since the scans carry film-dye casts.
+* The frame is located from the bright terrain, which reaches the frame's left, right and
+  bottom edges, checked against the frame-to-strip width ratio (0.758). Where the reseau
+  crosses are visible, the cross lattice is located in the whole scan and the frame edges
+  are placed 7.5 mm outside the outermost exposed cross columns. This handles bright ground
+  close-ups, and the magazines whose aperture exposes only four of the five columns.
+* The reseau crosses are found with a matched filter, fitted as a rigid grid, and removed
+  by filling each 1-2 px line from the pixels beside it, which keeps film grain.
+* Colour scans get a partial grey-world white balance, since the scans carry film-dye casts.
+* A frame is flagged (`qc_ok: false` in `processing.jsonl`) when a crop edge shows film
+  border (a black lower edge or sprocket holes) or neither frame-finding method succeeded.
 
-`processing.jsonl` records the crop and two quality flags per frame; frames where the crop
-fell back to the size prior (`qc_ok: false`) should be checked by eye. ASU does not serve
-magazine AS14-66 (36 frames). Depth maps are recomputed because the crops differ from the
-released ones; prompts come from `dataset.csv`.
+Result on the 1,876 frames of `dataset.csv`: 1,839 downloaded (ASU does not serve magazine
+AS14-66 or frame AS14-67-9374), 1,561 pass the quality check, 278 are flagged. Most flagged
+frames are downward-looking ground close-ups (AS15-84, AS15-89, AS16-105, AS16-112,
+AS17-139, AS17-144) whose crops still include the printed frame number; a few are
+landscapes with the lander's shadow across a bottom corner. Depth maps are recomputed
+because the crops differ from the released ones; prompts come from `dataset.csv`.
 
 ## Diagnostics so far
 
