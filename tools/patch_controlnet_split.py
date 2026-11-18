@@ -4,7 +4,8 @@ trainable ControlNet (weights + grads + Adam) on its own GPU and the frozen fp32
 second GPU (cuda:local_rank + DESPINA_UNET_DEVICE_OFFSET). Autograd carries gradients across
 devices. Without this, fp32 SDXL ControlNet training does not fit on a 24 GB P40.
 Also moves the text encoders to CPU once prompt embeddings are cached, and computes those
-embeddings 16 prompts at a time instead of 1000.
+embeddings 16 prompts at a time instead of 1000, and adds offset noise when
+DESPINA_NOISE_OFFSET is set.
 
   python tools/patch_controlnet_split.py third_party/train_controlnet_sdxl.py third_party/train_controlnet_sdxl_split.py
 """
@@ -49,5 +50,12 @@ old_map = "train_dataset = train_dataset.map(compute_embeddings_fn, batched=True
 assert s.count(old_map) == 1, "embedding map anchor not found"
 # the default map batch (1000 prompts) runs both text encoders at once and runs out of memory
 s = s.replace(old_map, old_map.replace("batched=True,", "batched=True, batch_size=16,"))
+# offset noise (as in the LoRA script): lets the model learn near-black regions like the lunar sky
+old_noise = "                noise = torch.randn_like(latents)\n"
+assert s.count(old_noise) == 1, "noise anchor not found"
+s = s.replace(old_noise, old_noise + (
+    "                _off = float(os.environ.get('DESPINA_NOISE_OFFSET', '0'))\n"
+    "                if _off:\n"
+    "                    noise += _off * torch.randn((latents.shape[0], latents.shape[1], 1, 1), device=latents.device)\n"))
 open(dst, "w").write(s)
 print("patched ->", dst)

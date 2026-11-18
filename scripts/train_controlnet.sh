@@ -25,6 +25,7 @@ if [ "$SPLIT" = 1 ]; then
   python tools/patch_controlnet_split.py third_party/train_controlnet_sdxl.py third_party/train_controlnet_sdxl_split.py
   export CUDA_VISIBLE_DEVICES=$GPUS DESPINA_UNET_DEVICE_OFFSET=$NP
   export PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
+  export DESPINA_NOISE_OFFSET=${NOISE_OFFSET:-0.1}   # offset noise, see train_lora.sh
   SCRIPT=third_party/train_controlnet_sdxl_split.py; GPU_ARG=""
 else
   NP=$N; SCRIPT=third_party/train_controlnet_sdxl.py; GPU_ARG="--gpu_ids $GPUS"
