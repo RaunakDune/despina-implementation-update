@@ -22,9 +22,9 @@ SPLIT=${SPLIT:-1}
 if [ "$SPLIT" = 1 ]; then
   [ $((N % 2)) -eq 0 ] || { echo "SPLIT=1 needs an even number of GPUs"; exit 1; }
   NP=$((N / 2))
-  [ -f third_party/train_controlnet_sdxl_split.py ] || \
-    python tools/patch_controlnet_split.py third_party/train_controlnet_sdxl.py third_party/train_controlnet_sdxl_split.py
+  python tools/patch_controlnet_split.py third_party/train_controlnet_sdxl.py third_party/train_controlnet_sdxl_split.py
   export CUDA_VISIBLE_DEVICES=$GPUS DESPINA_UNET_DEVICE_OFFSET=$NP
+  export PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
   SCRIPT=third_party/train_controlnet_sdxl_split.py; GPU_ARG=""
 else
   NP=$N; SCRIPT=third_party/train_controlnet_sdxl.py; GPU_ARG="--gpu_ids $GPUS"

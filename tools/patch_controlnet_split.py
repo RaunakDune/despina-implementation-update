@@ -3,7 +3,8 @@
 trainable ControlNet (weights + grads + Adam) on its own GPU and the frozen fp32 UNet on a
 second GPU (cuda:local_rank + DESPINA_UNET_DEVICE_OFFSET). Autograd carries gradients across
 devices. Without this, fp32 SDXL ControlNet training does not fit on a 24 GB P40.
-Also moves the text encoders to CPU once prompt embeddings are cached.
+Also moves the text encoders to CPU once prompt embeddings are cached, and computes those
+embeddings 16 prompts at a time instead of 1000.
 
   python tools/patch_controlnet_split.py third_party/train_controlnet_sdxl.py third_party/train_controlnet_sdxl_split.py
 """
@@ -44,5 +45,9 @@ s = s.replace(old_unet, new_unet)
 old_del = "    del text_encoders, tokenizers\n"
 assert s.count(old_del) == 1, "text encoder anchor not found"
 s = s.replace(old_del, old_del + '    text_encoder_one.to("cpu")\n    text_encoder_two.to("cpu")\n')
+old_map = "train_dataset = train_dataset.map(compute_embeddings_fn, batched=True, new_fingerprint=new_fingerprint)"
+assert s.count(old_map) == 1, "embedding map anchor not found"
+# the default map batch (1000 prompts) runs both text encoders at once and runs out of memory
+s = s.replace(old_map, old_map.replace("batched=True,", "batched=True, batch_size=16,"))
 open(dst, "w").write(s)
 print("patched ->", dst)
