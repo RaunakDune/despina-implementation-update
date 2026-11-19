@@ -228,6 +228,41 @@ AS17-139, AS17-144) whose crops still include the printed frame number; a few ar
 landscapes with the lander's shadow across a bottom corner. Depth maps are recomputed
 because the crops differ from the released ones; prompts come from `dataset.csv`.
 
+## Horizon-only ablation (repo DEM, no reference photos)
+
+Trained models: `runs/main/lora_noff` (LoRA with offset noise 0.1) with the ControlNets
+trained without offset noise (`runs/main/cn_depth`, `runs/main/cn_softedge`), the paper's
+conditioning settings (depth 0.8, soft edge 0.5, ControlNets to the last step). Eight views
+on the sample DEM (`configs/sites_ablation.yaml`: the hillside view and seven flat-ground
+views from `tools/find_views.py`), two seeds, Horizon RMSE in pixels at 512 px:
+
+| Configuration | Mean | Median | Images within 3 px | Paper (Table 2) |
+|---|---|---|---|---|
+| Base + Soft Edge | 83.8 | 68.9 | 6% | 5.21 |
+| Base + Depth Map | 66.9 | 13.3 | 50% | 3.18 |
+| LoRA + Soft Edge | 66.2 | 5.0 | 50% | 2.87 |
+| LoRA + Depth Map | 45.6 | 1.3 | 69% | 2.43 |
+| Full DESPINA system | 0.94 | 0.83 | 100% | 2.06 |
+
+The full system reproduces the DEM skyline on every image, with a black sky. The other
+configurations fail in two ways that this one number mixes: genuine failures (terrain
+drawn into the sky, a hill missing) and skylines the extractor cannot find because the sky
+is grey or bright. Their figures are upper bounds on the geometric error; the overlays in
+the diagnostics show which is which. The ordering matches the paper at both ends. Without
+the site photographs, SSIM and SoftEdge F1 cannot be computed.
+
+Things learned getting here:
+
+* SDXL could not render the black lunar sky after fine-tuning (it framed images to avoid the
+  sky or greyed it out). Offset noise in LoRA training fixed this; offset noise in
+  ControlNet training as well overcorrected and washed images out to near white.
+* Ground texture is the remaining weakness: the trained depth ControlNet renders smooth
+  ground, and stopping it early or lowering its weight does not help
+  (`configs/experiments_texture.yaml`).
+* The skyline extractor now sets its sky/ground threshold per image; a fixed threshold
+  misread grey skies and sent the path to the top row (15 of 17 released label maps within
+  1.7 px; median 0.6 px).
+
 ## Diagnostics so far
 
 These runs used a LoRA and ControlNets trained on 15 of the 17 sample images (300 steps

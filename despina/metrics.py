@@ -49,8 +49,13 @@ def extract_skyline(img, sky: str = "auto", smooth: float = 1.5, max_jump: int =
     pad = np.pad(g, ((k, k), (0, 0)), mode="edge")
     below = np.stack([pad[k + 1 + i: k + 1 + i + H] for i in range(k)]).mean(0)
     above = np.stack([pad[k - 1 - i: k - 1 - i + H] for i in range(k)]).mean(0)
-    edge = below - above                                      # dark above, bright below
-    thr = max(0.04, np.percentile(g, 30) * 0.5)
+    # Sky and ground levels from this image: a fixed threshold misreads a grey or noisy sky
+    # as "bright" and pushes the path to the top row.
+    sky_lvl = float(np.median(g[: max(H // 20, 1)]))
+    gnd_lvl = float(np.median(g[int(0.7 * H):]))
+    contrast = max(gnd_lvl - sky_lvl, 0.05)
+    edge = (below - above) / contrast                         # dark above, bright below
+    thr = max(0.04, sky_lvl + 0.5 * contrast)
     bright = (g > thr).astype(np.float32)
     bright_above = np.vstack([np.zeros((1, W), np.float32), np.cumsum(bright, 0)[:-1]]) / H
     cost = -edge + bright_weight * bright_above

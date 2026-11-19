@@ -1,0 +1,51 @@
+# Horizon-only ablation sites on the repo DEM (no reference photos, so only Horizon RMSE):
+# the hillside view plus seven Apollo-like flat-ground views found with tools/find_views.py.
+sites:
+  - name: hillside
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.55, col_frac: 0.5, heading_deg: 135, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_0
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.1624, col_frac: 0.4915, heading_deg: 270, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_1
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.1726, col_frac: 0.6195, heading_deg: 270, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_2
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.2398, col_frac: 0.7005, heading_deg: 270, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_3
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.6688, col_frac: 0.7747, heading_deg: 300, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_4
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.7602, col_frac: 0.8302, heading_deg: 300, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_5
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.8325, col_frac: 0.7577, heading_deg: 330, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly
+  - name: flat_view_6
+    dem: ../DESPINA_technical_details/TIF-to-image/dem_data.tif
+    upscale: 4
+    camera: {row_frac: 0.3071, col_frac: 0.8865, heading_deg: 270, pitch_deg: 0, hfov_deg: 49, eye_height_m: 1.6}
+    sun: {az: 120, el: 12}
+    category: hilly

@@ -1,0 +1,10 @@
+# Texture test for set A (offset-noise LoRA + trained ControlNets): does releasing the
+# ControlNets before the last denoising steps, or a weaker depth weight, let the LoRA add
+# ground detail without losing the black sky and the DEM skyline?
+seeds: [0]
+defaults: {steps: 30, guidance: 7.0, lora_scale: 0.9, size: 1024, control_end: 1.0}
+configs:
+  - {name: full_end08,     use_lora: true, controls: [depth, softedge], control_scales: [0.8, 0.5], control_end: 0.8, sources: {depth: dem, softedge: dem}}
+  - {name: full_end06,     use_lora: true, controls: [depth, softedge], control_scales: [0.8, 0.5], control_end: 0.6, sources: {depth: dem, softedge: dem}}
+  - {name: full_d06,       use_lora: true, controls: [depth, softedge], control_scales: [0.6, 0.5], sources: {depth: dem, softedge: dem}}
+  - {name: full_d06_end07, use_lora: true, controls: [depth, softedge], control_scales: [0.6, 0.5], control_end: 0.7, sources: {depth: dem, softedge: dem}}
