@@ -7,7 +7,7 @@ replaced by the assigned comma-separated GPU ids and CUDA_VISIBLE_DEVICES is NOT
 <state>/done/<hash>; rerunning the queue skips them. A GPU counts as free when the
 queue has not assigned it and nvidia-smi reports < FREE_MB used.
 
-  python tools/gpuq.py jobs.txt --state runs/queue --gpus 0,1,2,3,5,6,7
+  python tools/gpuq.py jobs.txt --state runs/queue --gpus 0,1,2,3
 """
 import argparse, hashlib, os, subprocess, time
 from pathlib import Path
@@ -25,11 +25,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("jobs")
     ap.add_argument("--state", default="runs/queue")
-    ap.add_argument("--gpus", default="0,1,2,3,5,6,7")
+    ap.add_argument("--gpus", default=None, help="comma-separated nvidia-smi indices (default: all)")
     ap.add_argument("--poll", type=float, default=20)
     a = ap.parse_args()
     st = Path(a.state); (st / "done").mkdir(parents=True, exist_ok=True); (st / "logs").mkdir(exist_ok=True)
-    allowed = [int(g) for g in a.gpus.split(",")]
+    allowed = [int(g) for g in a.gpus.split(",")] if a.gpus else sorted(used_mb())
     jobs = []
     for line in open(a.jobs):
         line = line.strip()

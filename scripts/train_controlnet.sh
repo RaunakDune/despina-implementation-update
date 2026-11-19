@@ -2,7 +2,7 @@
 # Group I, item 9: fine-tune an SDXL ControlNet on Apollo photos + their conditions.
 #   KIND=depth    starts from diffusers/controlnet-depth-sdxl-1.0, conditions = DPT depth
 #   KIND=softedge starts from SargeZT/controlnet-sd-xl-1.0-softedge-dexined, conditions = PiDiNet
-#   KIND=depth GPUS=0,1,2,3,5,6 DATA=data/train_set OUT=runs/cn_depth bash scripts/train_controlnet.sh
+#   KIND=depth GPUS=0,1,2,3,4,5 DATA=data/train_set OUT=runs/cn_depth bash scripts/train_controlnet.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 KIND=${KIND:-depth}; GPUS=${GPUS:-0}; DATA=${DATA:-data/train_set}; OUT=${OUT:-runs/cn_$KIND}

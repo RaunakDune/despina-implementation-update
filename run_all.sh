@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DESPINA end-to-end (multi-GPU server, no scheduler). Every phase is resumable:
+# DESPINA end-to-end on a multi-GPU machine without a job scheduler. Every phase is resumable:
 # rerun the same command after an interruption and finished work is skipped.
 #
 #   bash run_all.sh                          # all phases
@@ -24,8 +24,11 @@ DROOT=${DROOT:-DESPINA_dataset}
 SITES=${SITES:-configs/sites.yaml}
 EXP=${EXP:-configs/experiments.yaml}
 RUN=${RUN:-runs/main}
-TRAIN_GPUS=${TRAIN_GPUS:-0,1,2,3,5,6}     # six P40s (ControlNet training needs an even count)
-ALL_GPUS=${ALL_GPUS:-0,1,2,3,5,6,7}
+# GPUs by nvidia-smi index. Default: every GPU; training uses an even number of them.
+_GPUS=$(nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | paste -sd, -)
+ALL_GPUS=${ALL_GPUS:-${_GPUS:-0}}
+_N=$(echo "$ALL_GPUS" | tr ',' '\n' | wc -l); _E=$(( _N - _N % 2 )); [ "$_E" -lt 1 ] && _E=1
+TRAIN_GPUS=${TRAIN_GPUS:-$(echo "$ALL_GPUS" | cut -d, -f1-$_E)}
 LORA_STEPS=${LORA_STEPS:-3000}
 CN_STEPS=${CN_STEPS:-3000}
 PHASES=${PHASES:-"data prep train render gen eval"}

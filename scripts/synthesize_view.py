@@ -10,7 +10,7 @@ recognition. Writes into --out:
 
 Example (camera given as fractions of the DEM grid; see --help for lon/lat, x/y, row/col):
 
-  CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=6,7 python scripts/synthesize_view.py \
+  CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0,1 python scripts/synthesize_view.py \
       --dem DESPINA_technical_details/TIF-to-image/dem_data.tif --upscale 4 \
       --frac 0.2005,0.6348 --heading 270 --sun-az 120 --sun-el 12 \
       --lora runs/main/lora_noff --cn-depth runs/main/cn_depth --cn-softedge runs/main/cn_softedge \

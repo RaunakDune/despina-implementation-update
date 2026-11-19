@@ -60,7 +60,8 @@ are Apache 2.0 and keep their own license.
 | Known weakness | foreground ground is smoother than in Apollo photographs |
 | Paper Tables 1 and 2 | need the five evaluation sites (DEM, camera pose and reference photograph for each) in `configs/sites.yaml` |
 
-**Trained weights are not stored in this repository.** A training run writes them to:
+**Trained weights are not stored in this repository** (see the Hugging Face links once
+published). A training run writes them to these paths inside the repository:
 
 | Model | Path | Notes |
 |---|---|---|
@@ -77,7 +78,7 @@ defaults reproduce the recommended models.
 ## Quick start: synthesize a view from a DEM
 
 ```bash
-CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=6,7 python scripts/synthesize_view.py \
+CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0,1 python scripts/synthesize_view.py \
     --dem DESPINA_technical_details/TIF-to-image/dem_data.tif --upscale 4 \
     --frac 0.2005,0.6348 --heading 270 --sun-az 120 --sun-el 12 \
     --lora runs/main/lora_noff --cn-depth runs/main/cn_depth --cn-softedge runs/main/cn_softedge \
@@ -125,8 +126,8 @@ bash setup_env.sh          # Python 3.11 venv, torch 2.5.1+cu124, packages from 
 `setup_env.sh` downloads the two diffusers v0.31.0 training scripts into `third_party/` and
 patches them (see [Training](#training)). Model weights download from Hugging Face into
 `hf_cache/` on first use (SDXL base, the SDXL depth and soft-edge ControlNets, DPT,
-PiDiNet, BLIP; about 30 GB in fp32). The code was developed on a server with seven Tesla P40s (7x Tesla P40,
-1x Quadro P5000, no job scheduler); on GPUs with fast fp16 the pipeline switches to half
+PiDiNet, BLIP; about 30 GB in fp32). The code was developed on a server with seven
+24 GB Tesla P40s and no job scheduler; on GPUs with fast fp16 the pipeline switches to half
 precision automatically.
 
 Always set `CUDA_DEVICE_ORDER=PCI_BUS_ID` (the runners do) so CUDA's GPU numbers match
@@ -137,7 +138,7 @@ Always set `CUDA_DEVICE_ORDER=PCI_BUS_ID` (the runners do) so CUDA's GPU numbers
 ```bash
 bash run_all.sh                                   # all phases, resumable
 PHASES="data prep" bash run_all.sh                # rebuild the training set
-PHASES="train" TRAIN_GPUS=1,2,3,5,6,7 bash run_all.sh
+PHASES="train" TRAIN_GPUS=0,1,2,3,4,5 bash run_all.sh
 PHASES="render gen eval" SITES=configs/sites.yaml bash run_all.sh
 ```
 
@@ -152,6 +153,8 @@ PHASES="render gen eval" SITES=configs/sites.yaml bash run_all.sh
 
 `tools/gpuq.py` schedules the parallel jobs on free GPUs and skips finished ones, so any
 phase can be rerun after an interruption. Training resumes from the latest checkpoint.
+`ALL_GPUS` (default: every GPU) and `TRAIN_GPUS` (default: an even number of them) take
+comma-separated `nvidia-smi` indices; ControlNet training needs an even count.
 
 ### Sites and experiments
 
@@ -354,8 +357,8 @@ Smoke test on the 17 sample images:
 python scripts/render_sites.py --sites configs/sites.yaml --out runs/smoke/sites
 python scripts/prep_training_data.py --images DESPINA_dataset/processed_apollo_imgs --dataset-root DESPINA_dataset --out runs/smoke/train_set
 python scripts/build_parquet.py --prep runs/smoke/train_set
-GPUS=1,2 DATA=runs/smoke/train_set OUT=runs/smoke/lora STEPS=20 bash scripts/train_lora.sh
-KIND=depth GPUS=1,2 DATA=runs/smoke/train_set OUT=runs/smoke/cn_depth STEPS=10 bash scripts/train_controlnet.sh
-python tools/gpuq.py configs/jobs_smoke.txt --state runs/smoke/queue --gpus 1,2,6,7
+GPUS=0,1 DATA=runs/smoke/train_set OUT=runs/smoke/lora STEPS=20 bash scripts/train_lora.sh
+KIND=depth GPUS=0,1 DATA=runs/smoke/train_set OUT=runs/smoke/cn_depth STEPS=10 bash scripts/train_controlnet.sh
+python tools/gpuq.py configs/jobs_smoke.txt --state runs/smoke/queue --gpus 0,1,2,3
 python scripts/evaluate.py --sites-dir runs/smoke/sites --gen runs/smoke/gen --out runs/smoke/eval
 ```

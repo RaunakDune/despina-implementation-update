@@ -2,7 +2,7 @@
 # Group I, item 8: lunar LoRA on SDXL (diffusers v0.31.0 example script; tools/patch_lora_schedule.py
 # fixes its LR schedule for multi-GPU runs).
 # fp32 because Pascal GPUs have no fast fp16/bf16. Paper: batch 6 on 6 GPUs.
-#   GPUS=0,1,2,3,5,6 DATA=data/train_set OUT=runs/lora STEPS=3000 bash scripts/train_lora.sh
+#   GPUS=0,1,2,3,4,5 DATA=data/train_set OUT=runs/lora STEPS=3000 bash scripts/train_lora.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 GPUS=${GPUS:-0}; DATA=${DATA:-data/train_set}; OUT=${OUT:-runs/lora}
