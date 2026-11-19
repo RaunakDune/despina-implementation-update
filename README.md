@@ -7,7 +7,7 @@ DESPINA ray-casts a digital elevation model (DEM) into inverse-depth and soft-ed
 uses them to condition Stable Diffusion XL through ControlNet. A LoRA trained on Apollo
 surface photography supplies the lunar appearance.
 
-This work under active research, and as such code and implementation may change regularly. Please
+This work is under active research, and as such code and implementation may change regularly. Please
 be aware that DESPINA is a partial synthetic data pipeline designed to be slotted into a larger
 system, such a Visual Place Recognition model.
 
