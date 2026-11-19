@@ -60,8 +60,25 @@ are Apache 2.0 and keep their own license.
 | Known weakness | foreground ground is smoother than in Apollo photographs |
 | Paper Tables 1 and 2 | need the five evaluation sites (DEM, camera pose and reference photograph for each) in `configs/sites.yaml` |
 
-**Trained weights are not stored in this repository** (see the Hugging Face links once
-published). A training run writes them to these paths inside the repository:
+**The trained weights and the training set are on Hugging Face:**
+
+* [RonInDune/despina-lunar-sdxl](https://huggingface.co/RonInDune/despina-lunar-sdxl): the
+  lunar LoRA (`lora/`), the depth ControlNet (`controlnet-depth/`) and the soft-edge
+  ControlNet (`controlnet-softedge/`)
+* [RonInDune/despina-apollo-surface](https://huggingface.co/datasets/RonInDune/despina-apollo-surface):
+  the 1,561 processed Apollo frames with their depth maps, soft edges and prompts (private;
+  access on request, because ASU's scans are for research and education use only)
+
+Download the weights into the repository with:
+
+```bash
+huggingface-cli download RonInDune/despina-lunar-sdxl --local-dir weights
+```
+
+and pass `--lora weights/lora --cn-depth weights/controlnet-depth --cn-softedge
+weights/controlnet-softedge` to the scripts below in place of the `runs/main/...` paths.
+
+A training run writes the models to these paths inside the repository:
 
 | Model | Path | Notes |
 |---|---|---|
