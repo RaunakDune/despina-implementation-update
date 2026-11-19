@@ -36,6 +36,8 @@ def main():
     ap.add_argument("--size", type=int, default=1024)
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--only", default=None, help="comma-separated frame names")
+    ap.add_argument("--link-dir", default=None,
+                    help="also create this folder of symlinks to the frames that pass the quality check")
     ARGS = ap.parse_args()
     Path(ARGS.out).mkdir(parents=True, exist_ok=True)
     files = sorted(Path(ARGS.raw).glob("*.png"))
@@ -53,6 +55,20 @@ def main():
             if n % 100 == 0:
                 print(f"{n} processed, {err} errors", flush=True)
     print(f"done: {n} processed, {err} errors", flush=True)
+    log.close()
+    rows = [json.loads(l) for l in open(Path(ARGS.out) / "processing.jsonl")]
+    latest = {r["frame"]: r for r in rows}                       # last record per frame wins
+    ok = sorted(f for f, r in latest.items() if r.get("qc_ok"))
+    flagged = sorted(f for f, r in latest.items() if not r.get("qc_ok"))
+    json.dump(flagged, open(Path(ARGS.out) / "flagged.json", "w"))
+    print(f"quality check: {len(ok)} pass, {len(flagged)} flagged (flagged.json)", flush=True)
+    if ARGS.link_dir:
+        ld = Path(ARGS.link_dir); ld.mkdir(parents=True, exist_ok=True)
+        for f in ok:
+            dst = ld / f"{f}HR.png"
+            if not dst.exists():
+                dst.symlink_to((Path(ARGS.out) / f"{f}HR.png").resolve())
+        print(f"linked {len(ok)} frames into {ld}", flush=True)
 
 
 if __name__ == "__main__":

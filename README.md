@@ -1,29 +1,31 @@
-# DESPINA: implementation
+# DESPINA
 
-Code for **DESPINA: Synthesis of High-Fidelity Planetary Horizon Reconstructions Using
-DEM-Guided Diffusion** (ISPRS Annals of the Photogrammetry, Remote Sensing and Spatial
+Implementation of **DESPINA: Synthesis of High-Fidelity Planetary Horizon Reconstructions
+Using DEM-Guided Diffusion** (ISPRS Annals of the Photogrammetry, Remote Sensing and Spatial
 Information Sciences, XI-2-2026, 881-890).
-DESPINA ray-casts a digital elevation model (DEM) into inverse-depth and soft-edge maps and
-uses them to condition Stable Diffusion XL through ControlNet. A LoRA trained on Apollo
-surface photography supplies the lunar appearance.
 
-This work is under active research, and as such code and implementation may change regularly. Please
-be aware that DESPINA is a partial synthetic data pipeline designed to be slotted into a larger
-system, such a Visual Place Recognition model.
+DESPINA turns a digital elevation model (DEM) into realistic surface photographs. It
+ray-casts the DEM into an inverse-depth map and a shaded view whose soft edges outline the
+terrain, and uses both to condition Stable Diffusion XL through ControlNet. A LoRA trained
+on Apollo Hasselblad photography supplies the lunar appearance. The result is a
+photograph-like view of any position and direction on the DEM whose skyline matches the
+terrain.
+
+This work is under active research, and as such code and implementation may change
+regularly. Please be aware that DESPINA is a partial synthetic data pipeline designed to be
+slotted into a larger system, such as a Visual Place Recognition model.
 
 ## Authors
-
-DESPINA was designed and published by:
 
 * **Adam Nelson-Archer**, University of Houston
 * **Raunak Sarbajna**, Department of Computer Science, University of Houston
 * **Christoph F. Eick**, Department of Computer Science, University of Houston
 
-This repository reimplements the method from the paper. The original data and technical
-material are in the authors' repositories:
+Companion repositories:
 
-* [UH-DAIS/DESPINA_dataset](https://github.com/UH-DAIS/DESPINA_dataset): processed Apollo
-  photographs, DPT depth maps, label maps and BLIP prompts
+* [UH-DAIS/DESPINA_dataset](https://github.com/UH-DAIS/DESPINA_dataset): `dataset.csv` (the
+  1,876 training frames and their prompts), annotation files, and sample images with their
+  DPT depth maps and label maps
 * [UH-DAIS/DESPINA_technical_details](https://github.com/UH-DAIS/DESPINA_technical_details):
   DEM-to-image tooling and a sample lunar DEM
 
@@ -47,58 +49,69 @@ The code is released under the [MIT License](LICENSE). The paper is published un
 CC BY 4.0. The diffusers training scripts that `setup_env.sh` downloads into `third_party/`
 are Apache 2.0 and keep their own license.
 
-## Status
+## Current state (November 2026)
 
-The full pipeline runs end to end on the 17 sample images in `DESPINA_dataset` and the
-sample DEM in `DESPINA_technical_details`. The tables in the paper have not been
-reproduced yet: that needs the full training set (about 3,500 images in the paper; 1,876
-captioned in `dataset.csv`), the original checkpoints, and the camera poses and reference
-photographs for the five evaluation sites. See [Diagnostics so far](#diagnostics-so-far).
+| Item | State |
+|---|---|
+| Training data | 1,561 Apollo frames rebuilt from the NASA scans (1,277 train, 284 validation) |
+| Lunar LoRA | trained, 3,000 steps, offset noise 0.1 |
+| Depth and soft-edge ControlNets | trained, 3,000 steps each, no offset noise |
+| Horizon accuracy on the sample DEM | 0.94 px mean Horizon RMSE over 16 images (8 views, 2 seeds), black sky in every image |
+| Known weakness | foreground ground is smoother than in Apollo photographs |
+| Paper Tables 1 and 2 | need the five evaluation sites (DEM, camera pose and reference photograph for each) in `configs/sites.yaml` |
 
-## Repository layout
+**Trained weights are not stored in this repository.** A training run writes them to:
 
-```
-despina/     library: DEM loading and normals, ray caster, constraint extractors,
-             SDXL pipeline, metrics, statistics, site configuration
-scripts/     data preparation, training wrappers, site rendering, generation,
-             evaluation, view fitting, perceptual-study statistics
-tools/       GPU job queue, ControlNet two-GPU patch, Apollo-like viewpoint finder
-configs/     experiment and site definitions (paper configs and diagnostic configs)
-docs/        contact sheets from the smoke tests
-run_all.sh   resumable end-to-end runner
-```
+| Model | Path | Notes |
+|---|---|---|
+| Lunar LoRA (use this) | `runs/main/lora_noff/pytorch_lora_weights.safetensors` | offset noise 0.1 |
+| Depth ControlNet (use this) | `runs/main/cn_depth/` | |
+| Soft-edge ControlNet (use this) | `runs/main/cn_softedge/` | |
+| LoRA without offset noise | `runs/main/lora/` | cannot render a black sky; kept for comparison |
+| ControlNets with offset noise | `runs/main/cn_depth_noff/`, `runs/main/cn_softedge_noff/` | overexpose with the LoRA; not recommended |
+| Training set | `runs/main/train_set/{train,val}/data.parquet` | images, DPT depth, soft edges, prompts |
 
-`setup_env.sh`, `run_all.sh` and the scripts expect the two data repositories cloned into
-the repository root:
+To retrain from scratch anywhere, follow [Setup](#setup) and run `bash run_all.sh`; the
+defaults reproduce the recommended models.
+
+## Quick start: synthesize a view from a DEM
 
 ```bash
-git clone https://github.com/UH-DAIS/DESPINA_dataset
-git clone https://github.com/UH-DAIS/DESPINA_technical_details
+CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=6,7 python scripts/synthesize_view.py \
+    --dem DESPINA_technical_details/TIF-to-image/dem_data.tif --upscale 4 \
+    --frac 0.2005,0.6348 --heading 270 --sun-az 120 --sun-el 12 \
+    --lora runs/main/lora_noff --cn-depth runs/main/cn_depth --cn-softedge runs/main/cn_softedge \
+    --seeds 0,1 --out runs/synth/example --devices cuda:0,cuda:1
 ```
 
-## Paper-to-code map
+The camera position can be given as `--lonlat`, `--xy` (DEM map coordinates), `--rowcol`
+(DEM pixels) or `--frac` (fractions of the DEM grid). `--heading` is the view azimuth
+(0 = north, clockwise); `--hfov` defaults to 49 degrees, the Apollo Hasselblad 60 mm lens.
+The output folder receives `dem_depth.png`, `dem_sim.png`, `dem_softedge.png`,
+`dem_skyline.npy` (the DEM skyline row for every image column), `meta.json` and
+`image_seed<k>.png`. `--render-only` writes the DEM constraints without loading SDXL. With
+only one free GPU, `--devices cuda:0,cpu` keeps SDXL on the GPU and runs the ControlNets on
+the CPU (several times slower).
 
-| Paper (Fig. 4 item) | Code |
-|---|---|
-| I. DPT depth (2 to 3) | `despina/constraints.py: dpt_depth` (Intel/dpt-hybrid-midas, min-max inverse depth) |
-| I. PiDiNet soft edges (4 to 5.1) | `constraints.py: soft_edges` (lllyasviel/Annotators PiDiNet) |
-| I. BLIP prompts (6 to 7) | `constraints.py: blip_annotations, annotations_to_prompt` (same sentences as `dataset.csv`) |
-| I. Training set | `scripts/prep_training_data.py`, `scripts/build_parquet.py` (2,900 / 600 split by hash) |
-| I. LoRA (8) | `scripts/train_lora.sh` (diffusers v0.31.0 example script, unmodified) |
-| I. ControlNets (9) | `scripts/train_controlnet.sh` (fine-tunes pretrained SDXL depth and soft-edge ControlNets) |
-| II. DEM load and upscale (10) | `despina/dem.py: load_dem, upscale_dem` |
-| II. Horizon-aware constraint generation (11) | `despina/raycast.py: render_view` |
-| Eq. 1 normals | `dem.py: surface_normals` |
-| Eq. 2 adaptive far plane | `raycast.py` pre-pass (`far_mode="global"` or `"column"`) |
-| Eq. 3 inverse-depth normalisation | `raycast.py` step 3 |
-| Stratified skyline sampling | `raycast.py` step 2 (`supersample`, `band_px`) |
-| II. Simulated render (12) and soft edges (5.2) | `raycast.py` step 4 (Lommel-Seeliger shading, cast shadows, optional mosaic drape) |
-| III. Synthesis (14 to 18) | `despina/pipeline.py: Despina`, `scripts/generate.py` |
-| Classical DEM drape baseline | `RenderResult.sim_image` with `albedo:` set in `sites.yaml` |
-| Image-conditioned baseline | config `baseline_imgcond` (DPT depth of the real photo) |
-| Sec. 4 metrics | `despina/metrics.py`, `scripts/evaluate.py` (Tables 1 and 2) |
-| Tables 3 and 4 | `despina/stats.py`, `scripts/human_study_stats.py` |
-| Camera pose for a reference photo | `scripts/fit_view.py` (skyline matching) |
+The same steps from Python:
+
+```python
+from despina.dem import load_dem
+from despina.raycast import Camera, RenderConfig, render_view
+from despina import constraints as C
+from despina.pipeline import Despina, GenConfig
+
+dem = load_dem("dem.tif", upscale=4)
+cam = Camera(row=500, col=800, heading_deg=270, width=1024, height=1024)
+r = render_view(dem, cam, RenderConfig(sun_az_deg=120, sun_el_deg=12), device="cuda:0")
+cond = {"depth": r.inv_depth, "softedge": C.soft_edges(r.sim_image, "cuda:0")}
+model = Despina("cuda:0,cuda:1", lora_path="runs/main/lora_noff",
+                controlnet_paths={"depth": "runs/main/cn_depth", "softedge": "runs/main/cn_softedge"})
+img = model.generate(C.dem_prompt("hilly"), cond, GenConfig(), seed=0)
+```
+
+Views that look across flat ground toward relief, as most Apollo surface photographs do,
+work best. `tools/find_views.py` searches a DEM for such viewpoints and prints site entries.
 
 ## Setup
 
@@ -106,82 +119,236 @@ git clone https://github.com/UH-DAIS/DESPINA_technical_details
 git clone https://github.com/RaunakDune/despina-implementation-update despina && cd despina
 git clone https://github.com/UH-DAIS/DESPINA_dataset
 git clone https://github.com/UH-DAIS/DESPINA_technical_details
-bash setup_env.sh          # Python 3.11 venv, torch 2.5.1+cu124, diffusers 0.31.0, bitsandbytes
+bash setup_env.sh          # Python 3.11 venv, torch 2.5.1+cu124, packages from requirements.txt
 ```
-`setup_env.sh` also downloads the two diffusers v0.31.0 training scripts into `third_party/`
-and patches the ControlNet one for two-GPU training. Model weights are cached in
-`hf_cache/` inside the repository. The code was developed on a server with seven Tesla P40s (7x Tesla P40, 1x Quadro
-P5000, no job scheduler); on GPUs with fast fp16 the pipeline switches to half precision.
 
-## Running
+`setup_env.sh` downloads the two diffusers v0.31.0 training scripts into `third_party/` and
+patches them (see [Training](#training)). Model weights download from Hugging Face into
+`hf_cache/` on first use (SDXL base, the SDXL depth and soft-edge ControlNets, DPT,
+PiDiNet, BLIP; about 30 GB in fp32). The code was developed on a server with seven Tesla P40s (7x Tesla P40,
+1x Quadro P5000, no job scheduler); on GPUs with fast fp16 the pipeline switches to half
+precision automatically.
+
+Always set `CUDA_DEVICE_ORDER=PCI_BUS_ID` (the runners do) so CUDA's GPU numbers match
+`nvidia-smi`.
+
+## Running the whole pipeline
 
 ```bash
-# everything, resumable
-bash run_all.sh
-# or one phase at a time
-PHASES="prep" bash run_all.sh
-PHASES="train" LORA_STEPS=3000 CN_STEPS=3000 bash run_all.sh
-PHASES="render gen eval" bash run_all.sh
+bash run_all.sh                                   # all phases, resumable
+PHASES="data prep" bash run_all.sh                # rebuild the training set
+PHASES="train" TRAIN_GPUS=1,2,3,5,6,7 bash run_all.sh
+PHASES="render gen eval" SITES=configs/sites.yaml bash run_all.sh
 ```
-Results: `runs/main/eval/tables.md`, `per_site.csv`, `per_image.csv`; images in `runs/main/gen/<site>/<config>/seed*.png`.
 
-Generation configs (`configs/experiments.yaml`) are the five ablation rows of Table 2 plus
-the image-conditioned baseline of Table 1. Sites (`configs/sites.yaml`) take a DEM, a camera
-position (lon/lat, map x/y or DEM row/col), heading, pitch, field of view, sun direction and,
-for SSIM and SoftEdge F1, the reference photo of that view.
+| Phase | What it does | Output |
+|---|---|---|
+| data | downloads the frames in `dataset.csv` and turns each film-strip scan into a training image | `data/apollo_raw/`, `data/apollo_processed/`, `data/apollo_train_images/` |
+| prep | DPT depth, PiDiNet soft edges and prompts, packed to parquet | `runs/main/train_set/` |
+| train | LoRA, then depth ControlNet, then soft-edge ControlNet | `runs/main/lora`, `runs/main/cn_depth`, `runs/main/cn_softedge` |
+| render | DEM constraints for every site in `SITES` | `runs/main/sites/<site>/` |
+| gen | images for every configuration in `EXP` | `runs/main/gen/<site>/<config>/seed<k>.png` |
+| eval | SSIM, Horizon RMSE and SoftEdge F1 in terrain masks; Tables 1 and 2 | `runs/main/eval/tables.md`, `per_site.csv`, `per_image.csv` |
 
-## Implementation decisions
+`tools/gpuq.py` schedules the parallel jobs on free GPUs and skips finished ones, so any
+phase can be rerun after an interruption. Training resumes from the latest checkpoint.
 
-* **Precision.** Pascal GPUs have very slow fp16 and no bf16, so everything runs in fp32.
-  For inference, SDXL and the text encoders sit on one GPU and the ControlNets on a second
-  (`--devices cuda:0,cuda:1`). Each generation job uses a GPU pair.
-* **ControlNet training memory.** In fp32 a full SDXL ControlNet with Adam needs about 20 GB
-  on top of the 10 GB UNet. `scripts/train_controlnet.sh` therefore gives every training
-  process two GPUs (ControlNet and optimizer on one, frozen UNet on the other, via
-  `tools/patch_controlnet_split.py`) and uses 8-bit AdamW (bitsandbytes). Six P40s run three
-  data-parallel processes, so the effective batch is 3 (`ACC=2` gives the paper's 6).
-* **Depth tone mapping.** Exact Eq. 3 sends terrain beyond a few hundred metres to black, the
-  same value as the sky. The ControlNet is trained on DPT maps, where distant ridges sit just
-  above the sky. `RenderConfig.terrain_floor` (default 0.06) maps terrain to [0.06, 1] and
-  the sky to 0. Set it to 0 for the literal Eq. 3.
-* **Eq. 1 sign.** Implemented as normalize(-dh/dx, -dh/dy, 1), so normals point up and out.
-* **Far plane.** Eq. 2 is defined per azimuth. Normalising each column separately produces
-  vertical banding, so the default uses the maximum over columns (`far_mode="global"`).
-  The per-column version is available.
-* **DEM upscaling.** Bicubic interpolation of the height field. The paper cites Liu et al.
-  (2020b), which evaluates DEM accuracy and is not an upscaling method.
+### Sites and experiments
+
+`configs/sites.yaml` lists the views to synthesize and evaluate. Each site has a DEM
+(GeoTIFF), an optional `upscale`, a camera (`lon`/`lat`, `x`/`y`, `row`/`col` or
+`row_frac`/`col_frac`, plus `heading_deg`, `pitch_deg`, `hfov_deg`, `eye_height_m`), the sun
+direction, a terrain `category` (flat, hilly or rocky, which selects the prompt) and,
+for SSIM and SoftEdge F1, the `reference` photograph of that view and an optional
+`exclude_mask` of non-terrain pixels. When a photograph's pointing is unknown,
+`scripts/fit_view.py` estimates heading, pitch and field of view by matching its skyline to
+DEM skylines.
+
+`configs/experiments.yaml` defines the generation configurations: the five rows of Table 2
+(`base_softedge`, `base_depth`, `lora_softedge`, `lora_depth`, `full`) and the
+image-conditioned baseline of Table 1 (`baseline_imgcond`, which needs a reference photo).
+
+Other configs: `sites_ablation.yaml` (the eight views on the sample DEM used below),
+`sites_check.yaml` (four diagnostic views), `experiments_ablation.yaml`,
+`experiments_check.yaml`, `experiments_texture.yaml`, and `human_study_paper_counts.csv`
+(the perceptual-study counts for `scripts/human_study_stats.py`, which produces Tables 3
+and 4).
+
+## Training data
+
+The frames in `DESPINA_dataset/dataset.csv` are rebuilt from Arizona State University's
+[March to the Moon](https://tothemoon.im-ldi.com) archive of the Apollo Hasselblad film
+(the `data` phase, or by hand):
+
+```bash
+python tools/download_apollo.py --names DESPINA_dataset/dataset.csv --out data/apollo_raw --size med --workers 12
+python scripts/process_apollo.py --raw data/apollo_raw --out data/apollo_processed --workers 24 \
+    --link-dir data/apollo_train_images
+```
+
+`despina/apollo.py` turns each film-strip scan into a 1024 px training image:
+
+* B&W magazines are 16-bit greyscale scans and are scaled to 8 bits explicitly.
+* The frame is located from the bright terrain, which reaches the frame's left, right and
+  bottom edges, checked against the frame-to-strip width ratio (0.758). Where the reseau
+  crosses are visible, the cross lattice is located in the whole scan and the frame edges
+  are placed 7.5 mm outside the outermost exposed cross columns. This handles bright ground
+  close-ups and the magazines whose aperture exposes only four of the five columns.
+* The reseau crosses are found with a matched filter, fitted as a rigid grid, and removed by
+  filling each 1-2 px line from the pixels beside it, which keeps the film grain.
+* Colour scans get a partial grey-world white balance against film-dye casts.
+* A frame is flagged (`qc_ok: false` in `processing.jsonl`, listed in `flagged.json`) when a
+  crop edge shows film border or neither frame-finding method succeeded. Only frames that
+  pass are linked into `data/apollo_train_images/`.
+
+Of the 1,876 frames, 1,839 are available from the archive (magazine AS14-66 and frame
+AS14-67-9374 are not served), 1,561 pass the quality check and 278 are flagged. Most
+flagged frames are downward-looking ground close-ups (AS15-84, AS15-89, AS16-105, AS16-112,
+AS17-139, AS17-144) whose crops still show the printed frame number. Prompts come from
+`dataset.csv`; DPT depth maps are computed on the new crops. Previews are in
+`docs/dataset/`.
+
+## Training
+
+| Model | Script | Settings |
+|---|---|---|
+| Lunar LoRA | `scripts/train_lora.sh` | SDXL base, rank 16, LR 1e-4 cosine, 1024 px, offset noise 0.1 (`NOISE_OFFSET`), 3,000 steps, batch 6 on six GPUs |
+| Depth ControlNet | `KIND=depth scripts/train_controlnet.sh` | from `diffusers/controlnet-depth-sdxl-1.0`, DPT depth, LR 1e-5, 8-bit AdamW, 3,000 steps |
+| Soft-edge ControlNet | `KIND=softedge scripts/train_controlnet.sh` | from `SargeZT/controlnet-sd-xl-1.0-softedge-dexined`, PiDiNet soft edges, same settings |
+
+Both wrappers run the diffusers v0.31.0 example scripts through small patches applied on
+every run:
+
+* `tools/patch_lora_schedule.py` sizes the LR schedule for multi-GPU runs (accelerate steps
+  the scheduler once per process).
+* `tools/patch_controlnet_split.py` gives each training process two GPUs, with the
+  ControlNet and optimizer on one and the frozen UNet on the other; computes prompt
+  embeddings 16 at a time; and adds optional offset noise (`CN_NOISE_OFFSET`, default 0).
+
+**Offset noise matters for the sky.** Without it, the fine-tuned SDXL cannot render the
+black lunar sky: it frames images to avoid the sky or greys it out
+(`docs/results/lora_diagnostic_no_offset_noise.png`). Offset noise in LoRA training fixes
+this (`docs/results/lora_offset_noise_comparison.png`). Adding it to the ControlNets as well
+overexposes the images (`docs/results/controlnet_offset_noise_comparison.png`), so the
+ControlNets are trained without it.
+
+## Evaluation
+
+Section 4's metrics are in `despina/metrics.py`, all computed inside terrain masks: SSIM
+against the reference photograph, Horizon RMSE between the DEM skyline and the skyline
+extracted from the generated image, and SoftEdge F1 between PiDiNet edge maps.
+`scripts/evaluate.py` writes the per-image values and Tables 1 and 2.
+
+The skyline extractor runs dynamic programming over a dark-above, bright-below boundary
+cost, with the sky/ground threshold set from each image's own levels. On the 17 sample
+images with label maps it is within 1.7 px (at 256 px) on 15, with a median error of
+0.6 px.
+
+### Horizon-only ablation on the sample DEM
+
+Eight views on the sample DEM (`configs/sites_ablation.yaml`: one hillside view and seven
+flat-ground views from `tools/find_views.py`), two seeds, the recommended models, the
+conditioning settings of the paper (depth 0.8, soft edge 0.5). Horizon RMSE in pixels at
+512 px:
+
+| Configuration | Mean | Median | Images within 3 px | Published (Table 2) |
+|---|---|---|---|---|
+| Base + Soft Edge | 83.8 | 68.9 | 6% | 5.21 |
+| Base + Depth Map | 66.9 | 13.3 | 50% | 3.18 |
+| LoRA + Soft Edge | 66.2 | 5.0 | 50% | 2.87 |
+| LoRA + Depth Map | 45.6 | 1.3 | 69% | 2.43 |
+| Full DESPINA system | 0.94 | 0.83 | 100% | 2.06 |
+
+The full system reproduces the DEM skyline on every image, with a black sky
+(`docs/results/ablation_horizon.png`; green is the DEM skyline, red the extracted one). For
+the other configurations the number mixes genuine failures (terrain drawn into the sky, a
+missing hill) with skylines the extractor cannot find under a grey or bright sky, so their
+values are upper bounds on the geometric error. These views have no photographs, so SSIM
+and SoftEdge F1 are not computed.
+
+The ground texture test (`configs/experiments_texture.yaml`,
+`docs/results/texture_test.png`) found that stopping the ControlNets early or lowering the
+depth weight does not add surface detail; the paper's settings give the most texture.
+
+## Repository layout
+
+```
+despina/     library: DEM loading and normals, ray caster, Apollo frame processing,
+             constraint extractors, SDXL pipeline, metrics, statistics, site configuration
+scripts/     data preparation, training wrappers, site rendering, generation, single-view
+             synthesis, evaluation, view fitting, LoRA diagnostics, perceptual-study statistics
+tools/       Apollo downloader, GPU job queue, training-script patches, viewpoint finder
+configs/     site and experiment definitions
+docs/        dataset previews, result sheets and early test images
+run_all.sh   resumable end-to-end runner
+```
+
+## Paper-to-code map
+
+| Paper (Fig. 4 item) | Code |
+|---|---|
+| I. Apollo photographs, fiducial removal (1) | `tools/download_apollo.py`, `despina/apollo.py`, `scripts/process_apollo.py` |
+| I. DPT depth (2 to 3) | `despina/constraints.py: dpt_depth` (Intel/dpt-hybrid-midas, min-max inverse depth) |
+| I. PiDiNet soft edges (4 to 5.1) | `constraints.py: soft_edges` (lllyasviel/Annotators PiDiNet) |
+| I. BLIP prompts (6 to 7) | `constraints.py: blip_annotations, annotations_to_prompt` (same sentences as `dataset.csv`) |
+| I. Training set | `scripts/prep_training_data.py`, `scripts/build_parquet.py` (train/validation split by hash) |
+| I. LoRA (8) | `scripts/train_lora.sh` |
+| I. ControlNets (9) | `scripts/train_controlnet.sh` |
+| II. DEM load and upscale (10) | `despina/dem.py: load_dem, upscale_dem` |
+| II. Horizon-aware constraint generation (11) | `despina/raycast.py: render_view` |
+| Eq. 1 normals | `dem.py: surface_normals` |
+| Eq. 2 adaptive far plane | `raycast.py` pre-pass (`far_mode="global"` or `"column"`) |
+| Eq. 3 inverse-depth normalisation | `raycast.py` step 3 |
+| Stratified skyline sampling | `raycast.py` step 2 (`supersample`, `band_px`) |
+| II. Simulated render (12) and soft edges (5.2) | `raycast.py` step 4 (Lommel-Seeliger shading, cast shadows, optional mosaic drape) |
+| III. Synthesis (14 to 18) | `despina/pipeline.py: Despina`, `scripts/generate.py`, `scripts/synthesize_view.py` |
+| Classical DEM drape baseline | `RenderResult.sim_image` with `albedo:` set in the site |
+| Image-conditioned baseline | config `baseline_imgcond` (DPT depth of the real photo) |
+| Sec. 4 metrics | `despina/metrics.py`, `scripts/evaluate.py` (Tables 1 and 2) |
+| Tables 3 and 4 | `despina/stats.py`, `scripts/human_study_stats.py` |
+| Camera pose for a reference photo | `scripts/fit_view.py` (skyline matching) |
+
+## Implementation notes
+
+* **Precision.** Pascal GPUs have very slow fp16 and no bf16, so everything runs in fp32
+  there. For inference, SDXL and the text encoders sit on one GPU and the ControlNets on a
+  second (`--devices cuda:0,cuda:1`); each generation job uses a GPU pair.
+* **ControlNet training memory.** In fp32 a full SDXL ControlNet with Adam needs about
+  20 GB on top of the 10 GB UNet, hence the two-GPU split and 8-bit AdamW. Six P40s run
+  three data-parallel processes (effective batch 3; `ACC=2` gives 6).
+* **Depth tone mapping.** Terrain maps to [0.06, 1] and the sky to 0
+  (`RenderConfig.terrain_floor`), so distant ridges stay distinct from the sky as they are
+  in DPT maps of photographs. Set it to 0 for the plain Eq. 3 mapping.
+* **Normals.** Eq. 1 is implemented as normalize(-dh/dx, -dh/dy, 1), pointing up and out.
+* **Far plane.** The default normalises with the largest Eq. 2 far plane in the view
+  (`far_mode="global"`); `far_mode="column"` applies Eq. 2 per azimuth.
+* **DEM upscaling.** Bicubic interpolation of the height field.
 * **Curvature.** The ray caster subtracts r^2 / 2R (lunar R = 1737.4 km).
-* **Skyline extraction** for Horizon RMSE uses dynamic programming over a dark-sky boundary
-  cost. On the 17 released samples it is within 1.7 px (at 256 px) of the label-map skyline
-  on 16 of 17 images. The miss has a hill in deep shadow against the black sky.
+* **Viewpoints.** Apollo surface photographs mostly look across flat ground toward relief.
+  Views from steep slopes are harder for the models; `tools/find_views.py` finds
+  Apollo-like viewpoints.
 
-## Findings while reproducing the paper
+## Measured performance (Tesla P40, fp32)
 
-* **Table 2 "Relative Improvement".** Four of the five published values are the SSIM gain
-  alone (0.462/0.378 = +22.2%, 0.489/0.378 = +29.4%, 0.534/0.378 = +41.3%), not the
-  composite the footnote describes. The full system's +47.1% matches neither reading
-  (SSIM alone gives +49.2%). `evaluate.py` reports both readings.
-* **Tables 3 and 4** are reproduced exactly with 36 judgements per method and category, using
-  Wilson intervals, an exact binomial test against chance and a pooled two-proportion z-test.
-  The text says 35 participants.
-* **Dataset size.** `DESPINA_dataset/dataset.csv` lists 1,876 captioned images (AS11 to AS17).
-  The paper says about 3,500, and the repository contains 17 images.
+* Constraint rendering, 1024 px with the stratified skyline band: about 3 s per view.
+* Generation with SDXL on one P40 and the ControlNets on a second: about 150 s per 1024 px
+  image at 30 steps.
+* LoRA training: 7.5 s per step with one image per GPU (18.5 GB per P40); 3,000 steps on
+  six P40s take about 6.3 h.
+* ControlNet training: 8.5 s per step per two-GPU process; 3,000 steps take about 7 h per
+  ControlNet on six P40s.
+* Apollo data rebuild: download about 45 frames per minute; processing 1,839 frames on 24
+  CPU cores in about 3 minutes.
 
-## Measured performance
+## Early tests
 
-* Constraint rendering (1024 px, 3x3 stratified skyline band): about 3 s per view on a P40.
-* Generation, fp32, SDXL on one P40 and ControlNets on a second: about 100 s per 1024 px
-  image at 20 steps (about 150 s at 30). 6 configs x 3 seeds x 5 sites = 90 images, about
-  1.3 h on three GPU pairs.
-* LoRA training: 7.6 s/step with one image per GPU (18.5 GB per P40). 3,000 steps on six
-  P40s (batch 6) is about 6.5 h.
-* ControlNet training (split mode, 8-bit AdamW): 8.4 s/step per two-GPU process. 3,000 steps
-  on six P40s (batch 3) is about 7 h per ControlNet.
-* Without the lunar LoRA, SDXL treats the black sky of the DEM depth map as distant terrain
-  and fills it in (rows "Base + ..."), which is the failure mode the paper attributes to
-  base models. The image-conditioned baseline keeps a black sky.
+`docs/early_tests/` holds images from the first runs, with a LoRA and ControlNets trained on
+15 sample images. They show the pipeline working end to end, the effect of viewpoint (a
+camera on a steep hillside fills the sky with terrain; flat-ground views keep the DEM
+skyline), and that prompt wording alone ("Pitch black sky", available as `--prompt-suffix`
+in `scripts/generate.py`) does not darken the sky.
 
-## Smoke test
+Smoke test on the 17 sample images:
 
 ```bash
 python scripts/render_sites.py --sites configs/sites.yaml --out runs/smoke/sites
@@ -192,95 +359,3 @@ KIND=depth GPUS=1,2 DATA=runs/smoke/train_set OUT=runs/smoke/cn_depth STEPS=10 b
 python tools/gpuq.py configs/jobs_smoke.txt --state runs/smoke/queue --gpus 1,2,6,7
 python scripts/evaluate.py --sites-dir runs/smoke/sites --gen runs/smoke/gen --out runs/smoke/eval
 ```
-
-## Rebuilding the training images from the NASA scans
-
-The 17 sample images in `DESPINA_dataset` are all that is published of the training set, so
-the frames listed in its `dataset.csv` can be rebuilt from Arizona State University's
-[March to the Moon](https://tothemoon.im-ldi.com) archive of the Apollo Hasselblad film:
-
-```bash
-python tools/download_apollo.py --names DESPINA_dataset/dataset.csv --out data/apollo_raw --size med --workers 12
-python scripts/process_apollo.py --raw data/apollo_raw --out data/apollo_processed --workers 24
-python scripts/prep_training_data.py --images data/apollo_processed --dataset-root DESPINA_dataset \
-    --out data/train_set --recompute-depth           # one process per GPU with --shard/--num-shards
-python scripts/build_parquet.py --prep data/train_set
-```
-
-`despina/apollo.py` turns each film-strip scan into a training image:
-
-* B&W magazines are 16-bit greyscale scans and are scaled to 8 bits explicitly.
-* The frame is located from the bright terrain, which reaches the frame's left, right and
-  bottom edges, checked against the frame-to-strip width ratio (0.758). Where the reseau
-  crosses are visible, the cross lattice is located in the whole scan and the frame edges
-  are placed 7.5 mm outside the outermost exposed cross columns. This handles bright ground
-  close-ups, and the magazines whose aperture exposes only four of the five columns.
-* The reseau crosses are found with a matched filter, fitted as a rigid grid, and removed
-  by filling each 1-2 px line from the pixels beside it, which keeps film grain.
-* Colour scans get a partial grey-world white balance, since the scans carry film-dye casts.
-* A frame is flagged (`qc_ok: false` in `processing.jsonl`) when a crop edge shows film
-  border (a black lower edge or sprocket holes) or neither frame-finding method succeeded.
-
-Result on the 1,876 frames of `dataset.csv`: 1,839 downloaded (ASU does not serve magazine
-AS14-66 or frame AS14-67-9374), 1,561 pass the quality check, 278 are flagged. Most flagged
-frames are downward-looking ground close-ups (AS15-84, AS15-89, AS16-105, AS16-112,
-AS17-139, AS17-144) whose crops still include the printed frame number; a few are
-landscapes with the lander's shadow across a bottom corner. Depth maps are recomputed
-because the crops differ from the released ones; prompts come from `dataset.csv`.
-
-## Horizon-only ablation (repo DEM, no reference photos)
-
-Trained models: `runs/main/lora_noff` (LoRA with offset noise 0.1) with the ControlNets
-trained without offset noise (`runs/main/cn_depth`, `runs/main/cn_softedge`), the paper's
-conditioning settings (depth 0.8, soft edge 0.5, ControlNets to the last step). Eight views
-on the sample DEM (`configs/sites_ablation.yaml`: the hillside view and seven flat-ground
-views from `tools/find_views.py`), two seeds, Horizon RMSE in pixels at 512 px:
-
-| Configuration | Mean | Median | Images within 3 px | Paper (Table 2) |
-|---|---|---|---|---|
-| Base + Soft Edge | 83.8 | 68.9 | 6% | 5.21 |
-| Base + Depth Map | 66.9 | 13.3 | 50% | 3.18 |
-| LoRA + Soft Edge | 66.2 | 5.0 | 50% | 2.87 |
-| LoRA + Depth Map | 45.6 | 1.3 | 69% | 2.43 |
-| Full DESPINA system | 0.94 | 0.83 | 100% | 2.06 |
-
-The full system reproduces the DEM skyline on every image, with a black sky. The other
-configurations fail in two ways that this one number mixes: genuine failures (terrain
-drawn into the sky, a hill missing) and skylines the extractor cannot find because the sky
-is grey or bright. Their figures are upper bounds on the geometric error; the overlays in
-the diagnostics show which is which. The ordering matches the paper at both ends. Without
-the site photographs, SSIM and SoftEdge F1 cannot be computed.
-
-Things learned getting here:
-
-* SDXL could not render the black lunar sky after fine-tuning (it framed images to avoid the
-  sky or greyed it out). Offset noise in LoRA training fixed this; offset noise in
-  ControlNet training as well overcorrected and washed images out to near white.
-* Ground texture is the remaining weakness: the trained depth ControlNet renders smooth
-  ground, and stopping it early or lowering its weight does not help
-  (`configs/experiments_texture.yaml`).
-* The skyline extractor now sets its sky/ground threshold per image; a fixed threshold
-  misread grey skies and sent the path to the top row (15 of 17 released label maps within
-  1.7 px; median 0.6 px).
-
-## Diagnostics so far
-
-These runs used a LoRA and ControlNets trained on 15 of the 17 sample images (300 steps
-each), so they test the pipeline rather than the method.
-
-* `docs/smoke_test/contact_base_vs_lora20.png`, `lora17_contact.png`: on a camera standing on
-  a steep hillside, every configuration fills the sky with terrain. The LoRA changes the
-  colour and texture to match Apollo Hasselblad frames but does not restore the sky.
-* `contact_pretrainedCN.png`: from flat ground looking toward a hill (the framing of most
-  Apollo surface photos, found with `tools/find_views.py`), the generated hill follows the
-  DEM skyline. The sky is pale grey-teal rather than black. Weaker soft-edge conditioning
-  or stopping the ControlNets at 60% of the steps changes little.
-* `contact_finetunedCN.png`: ControlNets fine-tuned on the samples darken the sky to slate
-  grey and make the terrain closer to the Apollo photographs. The hillside view still fails.
-* `contact_blacksky.png`: adding "Pitch black sky, no atmosphere." to the prompt does not
-  darken the sky, and on one seed it fills the sky with terrain again. The option remains
-  as `--prompt-suffix` in `scripts/generate.py`.
-
-Viewpoint matters most: Apollo-like framing carries the DEM geometry into the image. Sky
-colour moved only with ControlNet training, and full-scale training is expected but not yet
-shown to make it black.

@@ -147,11 +147,10 @@ def evaluate_image(gen, ref, dem_skyline: np.ndarray, dem_h: int, size: int = 51
 
 
 def relative_improvement(row: dict, base: dict) -> dict:
-    """Two readings of Table 2's 'Relative Improvement'.
+    """Relative improvement over the Base + Soft Edge row of Table 2.
 
-    ssim_only reproduces 4 of the 5 published values exactly (0.462/0.378 = +22.2%,
-    0.489/0.378 = +29.4%, 0.534/0.378 = +41.3%); composite is the mean of the
-    three normalised gains described in the table footnote.
+    rel_ssim_only is the SSIM gain; rel_composite is the mean of the SSIM gain, the
+    SoftEdge F1 gain and the Horizon RMSE reduction.
     """
     s = row["ssim"] / base["ssim"] - 1
     f = row["softedge_f1"] / base["softedge_f1"] - 1

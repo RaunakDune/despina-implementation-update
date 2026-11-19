@@ -1,0 +1,23 @@
+# Installed by setup_env.sh into a Python 3.11 venv. torch comes from the CUDA 12.4 index:
+#   pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124
+diffusers==0.31.0
+transformers==4.46.3
+accelerate==1.1.1
+peft==0.13.2
+huggingface_hub<0.26
+bitsandbytes==0.45.0
+controlnet_aux==0.0.9
+safetensors
+datasets
+rasterio
+pyproj
+scikit-image
+opencv-python-headless
+numpy
+scipy
+pandas
+tabulate
+matplotlib
+pillow
+tqdm
+pyyaml

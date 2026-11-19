@@ -20,7 +20,7 @@ def _norm_sf(z: float) -> float:
 
 def binom_test_vs_chance(k: int, n: int, p0: float = 0.5) -> float:
     """Exact two-sided binomial test against chance. This is the test that
-    reproduces the 'vs. Chance' row of Table 4 (with 36 judgements per cell)."""
+    gives the 'vs. Chance' row of Table 4."""
     from scipy.stats import binomtest
     return float(binomtest(k, n, p0).pvalue) if n else float("nan")
 

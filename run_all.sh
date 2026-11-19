@@ -1,38 +1,49 @@
 #!/usr/bin/env bash
-# DESPINA end-to-end on a multi-GPU server (no scheduler). Every phase is resumable: rerun the same
-# command after an interruption and finished work is skipped.
+# DESPINA end-to-end (multi-GPU server, no scheduler). Every phase is resumable:
+# rerun the same command after an interruption and finished work is skipped.
 #
-#   bash run_all.sh                      # all phases
+#   bash run_all.sh                          # all phases
 #   PHASES="render gen eval" bash run_all.sh
 #
+# Phases: data (download and process the Apollo frames), prep (DPT depth, PiDiNet soft edges,
+# prompts, parquet), train (LoRA, depth ControlNet, soft-edge ControlNet), render (DEM
+# constraints for the sites), gen (images), eval (metrics and tables).
+#
 # Inputs (override with env vars):
-#   IMAGES   processed Apollo photos (paper: ~3,500 after filtering/inpainting)
-#   DROOT    folder with dataset.csv, depth_maps/, prompts/ (reused when present)
-#   SITES    evaluation sites yaml
+#   IMAGES   training images (default: the frames that pass the quality check in the data phase)
+#   DROOT    folder with dataset.csv and prompts/ (DESPINA_dataset)
+#   SITES    sites yaml          EXP  experiments yaml
+#   TRAIN_GPUS / ALL_GPUS   GPU ids by nvidia-smi numbering
 set -euo pipefail
 cd "$(dirname "$0")"
 source venv/bin/activate
 export CUDA_DEVICE_ORDER=PCI_BUS_ID   # match nvidia-smi numbering
 export HF_HOME=${HF_HOME:-$PWD/hf_cache}
-IMAGES=${IMAGES:-DESPINA_dataset/processed_apollo_imgs}
+IMAGES=${IMAGES:-data/apollo_train_images}
 DROOT=${DROOT:-DESPINA_dataset}
 SITES=${SITES:-configs/sites.yaml}
 EXP=${EXP:-configs/experiments.yaml}
 RUN=${RUN:-runs/main}
-TRAIN_GPUS=${TRAIN_GPUS:-0,1,2,3,5,6}     # six P40s, as in the paper's six-GPU setup
+TRAIN_GPUS=${TRAIN_GPUS:-0,1,2,3,5,6}     # six P40s (ControlNet training needs an even count)
 ALL_GPUS=${ALL_GPUS:-0,1,2,3,5,6,7}
 LORA_STEPS=${LORA_STEPS:-3000}
 CN_STEPS=${CN_STEPS:-3000}
-PHASES=${PHASES:-"prep train render gen eval"}
+PHASES=${PHASES:-"data prep train render gen eval"}
 mkdir -p "$RUN"
 
 has() { [[ " $PHASES " == *" $1 "* ]]; }
+
+if has data; then
+  python tools/download_apollo.py --names "$DROOT/dataset.csv" --out data/apollo_raw --size med --workers 12
+  python scripts/process_apollo.py --raw data/apollo_raw --out data/apollo_processed --workers 24 \
+    --link-dir data/apollo_train_images
+fi
 
 if has prep; then
   N=$(echo "$ALL_GPUS" | tr ',' '\n' | wc -l)
   : > "$RUN/jobs_prep.txt"
   for i in $(seq 0 $((N-1))); do
-    echo "1 python scripts/prep_training_data.py --images $IMAGES --dataset-root $DROOT --out $RUN/train_set --device cuda:0 --shard $i --num-shards $N" >> "$RUN/jobs_prep.txt"
+    echo "1 python scripts/prep_training_data.py --images $IMAGES --dataset-root $DROOT --out $RUN/train_set --device cuda:0 --recompute-depth --shard $i --num-shards $N" >> "$RUN/jobs_prep.txt"
   done
   python tools/gpuq.py "$RUN/jobs_prep.txt" --state "$RUN/queue" --gpus "$ALL_GPUS"
   python scripts/build_parquet.py --prep "$RUN/train_set"

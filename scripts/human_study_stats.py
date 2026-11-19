@@ -2,7 +2,7 @@
 """Tables 3 and 4 from perceptual-study counts.
 
 Input CSV columns: category,method,correct,total   (method in {despina, baseline})
-With the paper's numbers (36 judgements per cell) this reproduces Tables 3 and 4 exactly:
+configs/human_study_paper_counts.csv holds the study's counts (36 judgements per cell):
   flat,despina,8,36 / flat,baseline,23,36 / hilly,despina,12,36 / hilly,baseline,30,36 /
   rocky,despina,10,36 / rocky,baseline,18,36
 """
